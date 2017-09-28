@@ -24,11 +24,20 @@ Library functions can be accessed through various wrapper functions:
 
 As mentioned earlier, various subcomponents of these functions are under construction. Depending on build state, you may need to comment out some country-level parsers for wrappers to run without error. Please message me if you have any questions!
 
-## Details
-
-### Parsing and entity extraction
+## Parsing and entity extraction
+### Overview
 Currently, relations in ``Legislative_Data`` are defined using a co-mention approach. In other words, edges are drawn between extracted entities that co-occur within a given unit of analysis. In the United States, for example, the natural unit of analysis for legislative texts is the *section* (as articulated in the [Office of Law Revision Counsel's](http://uscode.house.gov/detailed_guide.xhtml) guidelines). As a result, splitting legislation into appropriate units of analysis (and cleaning extraneous text) is a critical step for the ``Legislative_Data`` library.
 
 The parsing functions in ``Legislative_Data`` rely on the parser implemented in [constitute_tools](https://github.com/rbshaffer/constitute_tools) to parse legislation into units of analysis, which is called and applied through ``_country_parsers_annual._CountryBase`` class (inherited by country-specific classes in ``_country_parsers_annual``). This parser cleans extraneous text, chunks documents into units of analysis (e.g. *sections* in the US case), and outputs a flat (csv-like) representation. This parsed text is then used in the entity extraction functions contained in ``_country_entities_annual._EntityBase``.  
 
-To substitute your own p
+### Customization
+If the included parser is not appropriate for your application, you can input your own pre-segmented texts to the entity extraction tool as follows:
+
+```
+>> from _country_entities_annual import _EntityBase as entity_manager
+>> chunks = ['We the People...', 'All legislative Powers...', ...] # format parsed text as list of strings
+>> manager = entity_manager(None) # null argument in place of parsed text
+>> manager.chunks = parsed
+>> edges = manager.do_entity_extraction()
+```
+This process saves a dictionary to ``edges``, which can then be saved to disk or manipulated. Here, ``chunks`` represents a single document; to process multiple documents, wrap this piece of code in a loop.
