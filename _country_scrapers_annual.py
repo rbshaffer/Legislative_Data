@@ -48,8 +48,8 @@ class Canada(_CountryBase):
                 amend = False
 
             # rarely, no published version of a bill is available
-            publication_tags = [tag for tag in bill_content.find_all('Publication')
-                                if tag.find(name='Title', language='en').text == 'Royal Assent']
+            publication_tags = [t for t in bill_content.find_all('Publication')
+                                if t.find(name='Title', language='en').text == 'Royal Assent']
             if len(publication_tags) == 1:
                 publication_id = publication_tags[0]['id']
             else:
@@ -64,7 +64,7 @@ class Canada(_CountryBase):
             majority_party = bill_content.PrimeMinister.PoliticalParty.find(name='Title', language='en').text
 
             committee_tags = bill_content.find_all(name='Committee', accronym=True)
-            committee_names = [tag['accronym'] for tag in committee_tags]
+            committee_names = [t['accronym'] for t in committee_tags]
             committee_data = {c: committee_names.count(c) for c in set(committee_names)}
 
             metadata = _format_meta_entry(country=u'canada',
@@ -95,7 +95,7 @@ class Canada(_CountryBase):
         for bill_type in bill_types:
             search_content = _BeautifulSoup(_urlopen(base_url.format(bill_type)))
             sessions = [_re.sub('&Page=1', '&download=xml', tag['href']) for tag in search_content.find_all('a')
-                        if _re.search('[0-9]{2}\-[0-9]\s*\([0-9]+\)', tag.text) is not None]
+                        if _re.search('[0-9]{2}-[0-9]\s*\([0-9]+\)', tag.text) is not None]
             searches += sessions
 
         id_vals = []
@@ -480,14 +480,12 @@ class Canada(_CountryBase):
 class UnitedKingdom(_CountryBase):
 
     def _get_ids(self):
-        import re
-
         id_vals = []
         years = range(1988, 2017)
 
         for year in years:
             soup = _BeautifulSoup(_urlopen('http://www.legislation.gov.uk/ukpga/{0}'.format(year)))
-            n_results = re.search('has returned ([0-9]+) results', soup.text.lower()).group(1)
+            n_results = _re.search('has returned ([0-9]+) results', soup.text.lower()).group(1)
             id_vals += [str(year) + '_' + str(i) for i in range(1, int(n_results) + 1)]
 
         return id_vals
@@ -612,7 +610,7 @@ class UnitedStates(_CountryBase):
 
     def _get_data(self, publication_id):
         import bs4
-
+        
         search_term = _re.sub('_', '/', publication_id)
 
         text_soup = None
