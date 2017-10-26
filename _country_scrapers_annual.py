@@ -610,7 +610,7 @@ class UnitedStates(_CountryBase):
 
     def _get_data(self, publication_id):
         import bs4
-        
+
         search_term = _re.sub('_', '/', publication_id)
 
         text_soup = None

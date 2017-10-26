@@ -1,4 +1,7 @@
-__author__ = 'rbshaffer'
+import re
+import os
+import codecs
+from constitute_tools import parser
 
 
 class _CountryBase:
@@ -7,7 +10,7 @@ class _CountryBase:
         self.file_path = file_path
         self.content = content
 
-        print content['id']
+        print(content['id'])
 
     def parse(self):
         parsed = self._do_parse()
@@ -19,15 +22,10 @@ class _CountryBase:
 
 class UnitedStates(_CountryBase):
     def _do_parse(self):
-        import re
-        import os
-        import codecs
-        from constitute_tools import parser
-
         if self.content['subtype'] == 'resolution' or not re.search('(SECTION|SEC\. [0-9]+)', self.content['html']):
             return []
         else:
-            cleaned = re.sub('\.\-\-', '<title>\n', self.content['html'])
+            cleaned = re.sub('\.--', '<title>\n', self.content['html'])
             cleaned = re.sub('``.*?\'\'|`.*?\'', '<snip>', cleaned, flags=re.DOTALL)
             cleaned = parser.clean_text(cleaned)
 
@@ -40,7 +38,7 @@ class UnitedStates(_CountryBase):
             if end is not None:
                 cleaned = cleaned[:end.start()]
 
-            temp_path = os.path.join('/tmp',os.path.basename(self.file_path))
+            temp_path = os.path.join('/tmp', os.path.basename(self.file_path))
             with codecs.open('/tmp/' + os.path.basename(self.file_path), 'wb', encoding='utf8') as f:
                 f.write(cleaned)
 

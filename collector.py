@@ -1,5 +1,9 @@
 import os
+import re
+import csv
 import json
+
+from datetime import datetime
 
 
 class DataManager:
@@ -48,7 +52,6 @@ class DataManager:
         key, which is used to generate the file path for the output.
         """
 
-        from datetime import datetime
         import _country_scrapers_annual
         _country_scrapers_annual = reload(_country_scrapers_annual)
 
@@ -76,13 +79,13 @@ class DataManager:
 
                 self.log_data = scraper.log_data
 
-                #write the updated log
+                # write the updated log
                 with open(self.log_path, 'wb') as f:
                     f.write(json.dumps(self.log_data))
 
     def append_parsed(self):
-        import os
         import _country_parsers_annual
+
         _country_scrapers_annual = reload(_country_parsers_annual)
 
         countries = [c for c in dir(_country_scrapers_annual) if '_' not in c]
@@ -105,7 +108,6 @@ class DataManager:
                     f.write(json.dumps(manager.content))
 
     def append_auxiliary(self):
-        import os
         import _country_auxiliary_annual
 
         countries = [c for c in dir(_country_auxiliary_annual) if '_' not in c]
@@ -120,8 +122,6 @@ class DataManager:
             appender.add_auxiliary()
 
     def extract_entities(self, write=True):
-        import os
-        import csv
         import _country_entities_annual
 
         _country_entities_annual = reload(_country_entities_annual)
@@ -137,8 +137,8 @@ class DataManager:
             file_list = os.listdir(country_dir)
 
             for file_name in file_list:
-                import re
-                # file_name = '112th-congress_house-bill_3321.json'
+                # testing
+                file_name = '107th-congress_house-bill_3162.json'
                 print re.sub('_', '/', file_name).strip('.json')
 
                 with open(country_dir + file_name, 'rb') as f:
@@ -153,8 +153,9 @@ class DataManager:
                         content['total_edges'] = parsed['total_edges']
                         content['n_cosponsors'] = len(content['cosponsors'])
 
-                        #if parsed['edges'] and raw_input('Draw graph?'):
-                        #    Visualize(parsed['edges'])
+                        if parsed['edges'] and raw_input('Draw graph?'):
+                           Visualize(parsed['edges'])
+                        raise
 
                         out.append(content)
 
@@ -190,18 +191,18 @@ class Visualize:
         import matplotlib.pyplot as plt
         import networkx as nx
 
-        plt.figure(figsize=(15, 15))
-        nx.draw_networkx_nodes(self.G, self.pos, node_size=0, alpha=0, node_color='black')
+        plt.figure(figsize=(10, 10))
+        nx.draw_networkx_nodes(self.G, self.pos, node_size=15, alpha=0.5, node_color='black')
 
         m = float(max([e[2] for e in self.edge_data]))
         for edge in self.edge_data:
             edge_list = [[edge[0], edge[1]]]
-            nx.draw_networkx_edges(self.G, self.pos, edgelist=edge_list, width=10, alpha=(edge[2]/m)**2, edge_color='b')
+            nx.draw_networkx_edges(self.G, self.pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=1,
+                                   edge_color='b')
 
         nx.draw_networkx_labels(self.G, self.pos, font_size=10, font_family='sans-serif')
         plt.axis('off')
         # plt.draw()
         # raw_input('')
         # plt.close()
-        plt.savefig("/home/rbshaffer/Desktop/fig1.pdf", dpi=100)
-
+        plt.savefig("/home/rbshaffer/Desktop/fig1.pdf", dpi=500)
