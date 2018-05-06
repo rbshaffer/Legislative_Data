@@ -5,6 +5,7 @@ from constitute_tools import parser
 
 
 class _CountryBase:
+
     def __init__(self, file_path, content):
 
         self.file_path = file_path

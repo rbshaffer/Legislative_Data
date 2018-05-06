@@ -7,10 +7,9 @@ from bs4 import BeautifulSoup as _BeautifulSoup
 
 
 class _CountryBase:
-    def __init__(self, country):
+    def __init__(self):
         self.agency_dictionary = {}
         self.training_data = []
-        self.country = country
 
     def update(self):
         return None
@@ -29,7 +28,13 @@ class UnitedStates(_CountryBase):
 
     @staticmethod
     def _preprocess_name(name_str):
+        import us
+
         isascii = lambda s: len(s) == len(s.encode(errors='ignore'))
+
+        blacklist = ['Medicaid', 'Medicare', 'Guam', 'Federated States of Micronesia',
+                     'American Samoa', 'Puerto Rico', 'Virgin Islands', 'Northern Mariana Islands',
+                     'Republic of The Marshall Islands', 'Regulation Ocean Energy Management']
 
         name_str = _re.sub('\(.*?\)|^U\.S\.|^USA?|^United States|of the United States$', '', name_str)
         name_str = name_str.strip()
@@ -40,10 +45,16 @@ class UnitedStates(_CountryBase):
         if _re.search('(Senate|House|Joint) Committee', name_str):
             name_str = _re.sub('(Senate|House|Joint)', '', name_str)
 
+        if _re.search(' Act| Act', name_str):
+            name_str = ''
+
         name_str = ''.join([c for c in name_str if isascii(c)])
         name_str = name_str.strip()
 
-        return name_str
+        if name_str not in [s.name for s in us.states.STATES] and name_str not in blacklist:
+            return name_str
+        else:
+            return ''
 
     def _update_usa(self):
         """
@@ -104,6 +115,7 @@ class UnitedStates(_CountryBase):
     def _update_wikipedia(self):
         # do a little bit of name preprocessing here too
         from requests import ConnectionError
+        from wikipedia import PageError
 
         print 'Getting data from Wikipedia...'
 
@@ -150,7 +162,7 @@ class UnitedStates(_CountryBase):
                                                   'name_full': result['title'],
                                                   'source': 'wikipedia'}
 
-                    except ConnectionError:
+                    except (ConnectionError, PageError):
                         print('Failed to get agency HTML!')
 
         self.agency_dictionary.update(agency_dic)

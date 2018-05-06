@@ -88,7 +88,7 @@ class DataManager:
 
         _country_scrapers_annual = reload(_country_parsers_annual)
 
-        countries = [c for c in dir(_country_scrapers_annual) if '_' not in c]
+        countries = [c for c in dir(_country_scrapers_annual) if re.search('^[A-Z]', c)]
 
         base_dir = '{1}{0}Legislation{0}{2}{0}Annual{0}'.format(os.sep, self.data_path, '{0}')
 
@@ -124,67 +124,88 @@ class DataManager:
     def extract_entities(self, write=True):
         import _country_entities_annual
 
-        _country_entities_annual = reload(_country_entities_annual)
+        countries = ['UnitedStates']
 
-        countries = [c for c in dir(_country_entities_annual) if '_' not in c]
         base_dir = '{1}{0}Legislation{0}{2}{0}Annual{0}'.format(os.sep, self.data_path, '{0}')
-        out_path = '{1}{0}Out{0}out_new.csv'.format(os.sep, self.data_path)
+        out_path = '{1}{0}Out{0}out.csv'.format(os.sep, self.data_path)
 
         out = []
 
         for country in countries:
+            parser = getattr(_country_entities_annual, country)()
+
             country_dir = base_dir.format(country)
             file_list = os.listdir(country_dir)
 
             for file_name in file_list:
                 # testing
-                file_name = '107th-congress_house-bill_3162.json'
+                #file_name = '111th-congress_house-bill_1.json'
+                file_name = '111th-congress_senate-bill_1707.json'
+
                 print re.sub('_', '/', file_name).strip('.json')
 
                 with open(country_dir + file_name, 'rb') as f:
                     content = json.loads(f.read())
 
                     if content['parsed']:
-                        parser = getattr(_country_entities_annual, country)(content['parsed'])
-                        parsed = parser.do_entity_extraction()
-                        print parsed['edges']
-                        raw_input('')
-                        content['density'] = parsed['density']
+                        parsed = parser.do_entity_extraction(content['parsed'])
+
+                        with open('/home/rbshaffer/Desktop/defense_aid_graph.csv', 'w') as f:
+                            csv.writer(f).writerows(parsed['edges'])
+                        raise
+
+                        content['total_nodes'] = parsed['total_nodes']
                         content['total_edges'] = parsed['total_edges']
+                        content['clustering'] = parsed['clustering']
+                        content['average_degree'] = parsed['average_degree']
+
                         content['n_cosponsors'] = len(content['cosponsors'])
 
-                        if parsed['edges'] and raw_input('Draw graph?'):
-                           Visualize(parsed['edges'])
-                        raise
+                        if content['hearings']:
+                            content['hearings'] = len(content['hearings'])
+                        else:
+                            content['hearings'] = 0
+
+                        if content['referred']:
+                            content['referred'] = len(content['referred'])
+                        else:
+                            content['referred'] = 0
+
+                        #if parsed['graph'] and raw_input('Draw graph?'):
+                        #    Visualize(parsed['graph'], parsed['edges'])
+                        #    raise
 
                         out.append(content)
 
         if write:
             with open(out_path, 'wb') as f:
-                writer = csv.DictWriter(f, fieldnames=['id', 'date', 'title', 'density', 'total_edges', 'topic',
-                                                       'sponsor', 'dw', 'sponsor_party', 'sponsor_majority',
-                                                       'n_cosponsors', 'control', 'president_party', 'commemorative'],
+                writer = csv.DictWriter(f, fieldnames=['id', 'date', 'title', 'clustering', 'total_nodes',
+                                                       'total_edges', 'average_degree', 'topic', 'sponsor', 'dw',
+                                                       'sponsor_party', 'sponsor_majority', 'n_cosponsors',
+                                                       'hearings', 'referred', 'control',
+                                                       'president_party', 'commemorative'],
                                         extrasaction='ignore')
                 writer.writeheader()
                 writer.writerows(out)
 
 
 class Visualize:
-    def __init__(self, edge_data):
+    def __init__(self, graph, edge_data):
         import textwrap
         import networkx as nx
 
-        self.edge_data = [('\n'.join(textwrap.wrap(edge[0].title().strip(), 20)),
-                           '\n'.join(textwrap.wrap(edge[1].title().strip(), 20)),
-                           edge[2]) for edge in edge_data]
+        self.G = graph
 
-        self.G = nx.Graph()
-        weights = []
-        for u, v, w in self.edge_data:
-            self.G.add_edge(u, v, weight=w)
-            weights.append(w)
+        self.edge_data = edge_data
 
         self.pos = nx.nx_pydot.graphviz_layout(self.G)
+
+        print 'Centrality:'
+
+        eigs = nx.eigenvector_centrality(self.G, weight='weight')
+        print zip(sorted(eigs, key=eigs.get, reverse=True), sorted(eigs.values(), reverse=True))
+        print nx.average_clustering(self.G, weight='weight')
+
         self.draw()
 
     def draw(self):
@@ -197,7 +218,7 @@ class Visualize:
         m = float(max([e[2] for e in self.edge_data]))
         for edge in self.edge_data:
             edge_list = [[edge[0], edge[1]]]
-            nx.draw_networkx_edges(self.G, self.pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=1,
+            nx.draw_networkx_edges(self.G, self.pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=0.3,
                                    edge_color='b')
 
         nx.draw_networkx_labels(self.G, self.pos, font_size=10, font_family='sans-serif')
