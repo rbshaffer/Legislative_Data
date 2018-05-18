@@ -22,12 +22,12 @@ class DataManager:
         if not os.path.exists(self.wrk_dir):
             raise OSError('The given working directory does not exist!')
         else:
-            self.data_path = '{1}{0}Legislative_Data'.format(os.sep, self.wrk_dir)
-            self.log_path = '{1}{0}Legislative_Data{0}log.json'.format(os.sep, self.wrk_dir)
+            self.data_path = os.path.join(self.wrk_dir, 'Legislative_Data')
+            self.log_path = os.path.join(self.wrk_dir, 'Legislative_Data', 'log.json')
 
             if not os.path.exists(self.data_path):
                 os.mkdir(self.data_path)
-                os.mkdir('{1}{0}Legislation'.format(os.sep, self.data_path))
+                os.mkdir(os.path.join(self.data_path, 'Legislation'))
 
             if not os.path.exists(self.log_path):
                 log_data = {'last updated': None}
@@ -41,7 +41,7 @@ class DataManager:
 
         self.log_data = log_data
 
-    def update_data(self):
+    def update_annual(self):
         """
         Wrapper function to run the various scrapers contained in the package and write the outputs. Also sets up file
         structure for output within each country. Initializes each scraper, and updates on-disk dataset based on the
@@ -53,7 +53,6 @@ class DataManager:
         """
 
         import _country_scrapers_annual
-        _country_scrapers_annual = reload(_country_scrapers_annual)
 
         self.log_data['last updated'] = datetime.now().strftime('%m/%d/%Y')
 
@@ -61,19 +60,49 @@ class DataManager:
 
         for country in countries:
             # initialize the file structure if working with a new country
-            print country
+            print(country)
 
-            if country not in self.log_data:
-                self.log_data[country] = []
-                os.mkdir('{1}{0}Legislation{0}{2}'.format(os.sep, self.data_path, country.strip('_')))
-                os.mkdir('{1}{0}Legislation{0}{2}{0}Annual'.format(os.sep, self.data_path, country.strip('_')))
-                os.mkdir('{1}{0}Legislation{0}{2}{0}Consolidated'.format(os.sep, self.data_path, country.strip('_')))
+            self._initialize_files(country)
 
             # Initialize the scraper for annual legislation for a given country, and write the output
             scraper = getattr(_country_scrapers_annual, country)(self.log_data, country)
             for entry in scraper.iter_data():
-                out_path = '{1}{0}Legislation{0}{2}{0}Annual{0}{3}.json'.format(os.sep, self.data_path,
-                                                                                country.strip('_'), entry['id'])
+                out_path = os.path.join(self.data_path, 'Legislation',
+                                        country.strip('_'), 'Annual',
+                                        entry['id']) + '.json'
+
+                with open(out_path, 'wb') as f:
+                    f.write(json.dumps(entry))
+
+                self.log_data = scraper.log_data
+
+                # write the updated log
+                with open(self.log_path, 'wb') as f:
+                    f.write(json.dumps(self.log_data))
+
+    def update_consolidated(self):
+        """
+        Wrapper function to scrape consolidated code files. Currently only implemented for the United States.
+
+        """
+        import _country_scrapers_consolidated
+
+        self.log_data['last updated'] = datetime.now().strftime('%m/%d/%Y')
+
+        countries = [c for c in dir(_country_scrapers_consolidated) if '_' not in c]
+
+        for country in countries:
+            print(country)
+
+            self._initialize_files(country)
+
+            scraper = getattr(_country_scrapers_consolidated, country)(self.log_data, country)
+
+            for entry in scraper.iter_data():
+                out_path = os.path.join(self.data_path, 'Legislation',
+                                        country.strip('_'), 'Consolidated',
+                                        entry['id']) + '.json'
+
                 with open(out_path, 'wb') as f:
                     f.write(json.dumps(entry))
 
@@ -90,7 +119,7 @@ class DataManager:
 
         countries = [c for c in dir(_country_scrapers_annual) if re.search('^[A-Z]', c)]
 
-        base_dir = '{1}{0}Legislation{0}{2}{0}Annual{0}'.format(os.sep, self.data_path, '{0}')
+        base_dir = os.path.join(self.data_path, 'Legislation', '{0}', 'Annual')
 
         for country in countries:
             country_dir = base_dir.format(country)
@@ -111,8 +140,8 @@ class DataManager:
         import _country_auxiliary_annual
 
         countries = [c for c in dir(_country_auxiliary_annual) if '_' not in c]
-        base_dir = '{1}{0}Legislation{0}{2}{0}Annual{0}'.format(os.sep, self.data_path, '{0}')
-        aux_dir = '{1}{0}Auxiliary{0}'.format(os.sep, self.data_path)
+        base_dir = os.path.join(self.data_path, 'Legislation', '{0}', 'Annual')
+        aux_dir = os.path.join(self.data_path, 'Auxiliary')
 
         for country in countries:
             country_path = base_dir.format(country)
@@ -126,8 +155,8 @@ class DataManager:
 
         countries = ['UnitedStates']
 
-        base_dir = '{1}{0}Legislation{0}{2}{0}Annual{0}'.format(os.sep, self.data_path, '{0}')
-        out_path = '{1}{0}Out{0}out.csv'.format(os.sep, self.data_path)
+        base_dir = os.path.join(self.data_path, 'Legislation', '{0}', 'Annual')
+        out_path = os.path.join(self.data_path, 'Out', 'out.csv')
 
         out = []
 
@@ -138,10 +167,6 @@ class DataManager:
             file_list = os.listdir(country_dir)
 
             for file_name in file_list:
-                # testing
-                #file_name = '111th-congress_house-bill_1.json'
-                file_name = '111th-congress_senate-bill_1707.json'
-
                 print re.sub('_', '/', file_name).strip('.json')
 
                 with open(country_dir + file_name, 'rb') as f:
@@ -150,30 +175,11 @@ class DataManager:
                     if content['parsed']:
                         parsed = parser.do_entity_extraction(content['parsed'])
 
-                        with open('/home/rbshaffer/Desktop/defense_aid_graph.csv', 'w') as f:
-                            csv.writer(f).writerows(parsed['edges'])
-                        raise
+                        keys_to_add = ['total_nodes', 'total_edges', 'clustering', 'average_degree']
+                        null_keys = ['n_cosponsors', 'hearings', 'referred']
 
-                        content['total_nodes'] = parsed['total_nodes']
-                        content['total_edges'] = parsed['total_edges']
-                        content['clustering'] = parsed['clustering']
-                        content['average_degree'] = parsed['average_degree']
-
-                        content['n_cosponsors'] = len(content['cosponsors'])
-
-                        if content['hearings']:
-                            content['hearings'] = len(content['hearings'])
-                        else:
-                            content['hearings'] = 0
-
-                        if content['referred']:
-                            content['referred'] = len(content['referred'])
-                        else:
-                            content['referred'] = 0
-
-                        #if parsed['graph'] and raw_input('Draw graph?'):
-                        #    Visualize(parsed['graph'], parsed['edges'])
-                        #    raise
+                        content.update({k: parsed[k] for k in keys_to_add})
+                        content.update({k: len(content[k]) if content[k] else 0 for k in null_keys})
 
                         out.append(content)
 
@@ -188,40 +194,67 @@ class DataManager:
                 writer.writeheader()
                 writer.writerows(out)
 
+    def _initialize_files(self, country):
+        if country not in self.log_data:
+            self.log_data[country] = []
+
+            os.path.join(self.data_path, 'Legislation', country.strip('_'))
+            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_')))
+            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Annual'))
+            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Consolidated'))
+
 
 class Visualize:
-    def __init__(self, graph, edge_data):
-        import textwrap
+    def __init__(self, wrk_dir, country):
+        import _country_entities_annual
+
+        # some test examples
+        # file_name = '111th-congress_house-bill_1.json'
+        # file_name = '111th-congress_senate-bill_1707.json'
+
+        self.wrk_dir = wrk_dir.rstrip(os.sep)
+        self.parser = getattr(_country_entities_annual, country)()
+
+        self.G = None
+        self.edges = None
+
+    def analyze(self, path, out_path=None):
         import networkx as nx
 
-        self.G = graph
+        with open(os.path.join(self.wrk_dir, path), 'rb') as f:
+            content = json.loads(f.read())
 
-        self.edge_data = edge_data
+        parsed = self.parser.do_entity_extraction(content['parsed'])
 
-        self.pos = nx.nx_pydot.graphviz_layout(self.G)
-
-        print 'Centrality:'
+        self.G = parsed['graph']
+        self.edges = parsed['edges']
 
         eigs = nx.eigenvector_centrality(self.G, weight='weight')
+
+        print 'Centrality:'
         print zip(sorted(eigs, key=eigs.get, reverse=True), sorted(eigs.values(), reverse=True))
         print nx.average_clustering(self.G, weight='weight')
 
-        self.draw()
+        if out_path:
+            with open(out_path, 'w') as f:
+                csv.writer(f).writerows(self.edges)
 
     def draw(self):
         import matplotlib.pyplot as plt
         import networkx as nx
 
-        plt.figure(figsize=(10, 10))
-        nx.draw_networkx_nodes(self.G, self.pos, node_size=15, alpha=0.5, node_color='black')
+        pos = nx.nx_pydot.graphviz_layout(self.G)
 
-        m = float(max([e[2] for e in self.edge_data]))
-        for edge in self.edge_data:
+        plt.figure(figsize=(10, 10))
+        nx.draw_networkx_nodes(self.G, pos, node_size=15, alpha=0.5, node_color='black')
+
+        m = float(max([e[2] for e in self.edges]))
+        for edge in self.edges:
             edge_list = [[edge[0], edge[1]]]
-            nx.draw_networkx_edges(self.G, self.pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=0.3,
+            nx.draw_networkx_edges(self.G, pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=0.3,
                                    edge_color='b')
 
-        nx.draw_networkx_labels(self.G, self.pos, font_size=10, font_family='sans-serif')
+        nx.draw_networkx_labels(self.G, pos, font_size=10, font_family='sans-serif')
         plt.axis('off')
         # plt.draw()
         # raw_input('')
