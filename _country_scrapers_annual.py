@@ -15,7 +15,7 @@ class _CountryBase:
         self.country = country
 
         for id_val in self._get_ids():
-            if id_val not in self.log_data[self.country] and id_val is not None:
+            if id_val not in self.log_data['Annual'][self.country] and id_val is not None:
                 self.new_ids.append(id_val)
 
     def iter_data(self):
@@ -23,7 +23,7 @@ class _CountryBase:
             print id_val
             yield self._get_data(id_val)
 
-            self.log_data[self.country].append(id_val)
+            self.log_data['Annual'][self.country].append(id_val)
 
     def _get_ids(self):
         return list()
@@ -33,7 +33,6 @@ class _CountryBase:
 
 
 class Canada(_CountryBase):
-
     def _get_ids(self):
         """ Note structure here is a little different than later classes - metadata and IDs retrieved at same time. """
 
@@ -107,7 +106,7 @@ class Canada(_CountryBase):
             for bill in bills:
                 meta = get_meta(bill)
 
-                if meta['id'] not in self.log_data['Canada']:
+                if meta['id'] not in self.log_data['Annual']['Canada']:
                     id_vals.append(meta['id'])
                     self.data[meta['id']] = meta
 
@@ -234,12 +233,12 @@ class Canada(_CountryBase):
 #
 #     def iter_data(self):
 #         for entry in self.meta:
-#             if entry['id'] not in self.log_data['Canada'] and entry['id'] is not None:
+#             if entry['id'] not in self.log_data['Annual']['Canada'] and entry['id'] is not None:
 #                 print entry['id']
 #                 entry.update(self.get_text(entry['id']))
 #                 yield entry
 #
-#                 self.log_data['Canada'].append(entry['id'])
+#                 self.log_data['Annual']['Canada'].append(entry['id'])
 #
 #     @staticmethod
 #     def get_meta(url):

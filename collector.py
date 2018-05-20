@@ -62,7 +62,7 @@ class DataManager:
             # initialize the file structure if working with a new country
             print(country)
 
-            self._initialize_files(country)
+            self._initialize_folders(country)
 
             # Initialize the scraper for annual legislation for a given country, and write the output
             scraper = getattr(_country_scrapers_annual, country)(self.log_data, country)
@@ -94,9 +94,9 @@ class DataManager:
         for country in countries:
             print(country)
 
-            self._initialize_files(country)
+            self._initialize_folders(country)
 
-            scraper = getattr(_country_scrapers_consolidated, country)(self.log_data, country)
+            scraper = getattr(_country_scrapers_consolidated, country)(self.log_data, country, self.data_path)
 
             for entry in scraper.iter_data():
                 out_path = os.path.join(self.data_path, 'Legislation',
@@ -194,7 +194,7 @@ class DataManager:
                 writer.writeheader()
                 writer.writerows(out)
 
-    def _initialize_files(self, country):
+    def _initialize_folders(self, country):
         if country not in self.log_data:
             self.log_data[country] = []
 
