@@ -14,7 +14,7 @@ class _CountryBase:
 
         self.log_data = log_data
         self.country = country
-        self.data_path = _os.path.join(base_path, country, 'Consolidated')
+        self.data_path = _os.path.join(base_path, 'Legislation', country, 'Consolidated')
 
         if 'Consolidated' not in self.log_data:
             self.log_data['Consolidated'] = {}
