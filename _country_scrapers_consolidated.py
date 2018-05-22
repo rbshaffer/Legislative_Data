@@ -67,7 +67,7 @@ class UnitedStates(_CountryBase):
     def _extract_code(self, publication_id):
         def section_parser(soup):
             def num_search(tag):
-                return _re.search('[0-9]+[a-z]*\.', tag.text).group(0)
+                return _re.search('[0-9]+[a-zA-Z]*\.', tag.text).group(0).lower().strip('.')
 
             section_head = soup.find('h3', class_='section-head')
             next_tag = section_head.find_next_sibling(['h3', 'p'])
@@ -118,7 +118,9 @@ class UnitedStates(_CountryBase):
                 else:
                     chapter_data[s] = {publication_id: sections[s]}
 
-            with open(_os.path.join(self.data_path, ch_name)) as f:
+            to_write = _os.path.join(self.data_path, _re.sub('\.htm', '', ch_name), '.json')
+
+            with open(to_write, 'w') as f:
                 f.write(_json.dumps(chapter_data))
 
         _os.rmdir(temp_folder)
