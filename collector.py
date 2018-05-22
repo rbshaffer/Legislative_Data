@@ -97,20 +97,13 @@ class DataManager:
             self._initialize_folders(country)
 
             scraper = getattr(_country_scrapers_consolidated, country)(self.log_data, country, self.data_path)
+            scraper.update_code()
 
-            for entry in scraper.iter_data():
-                out_path = os.path.join(self.data_path, 'Legislation',
-                                        country.strip('_'), 'Consolidated',
-                                        entry['id']) + '.json'
+            self.log_data = scraper.log_data
 
-                with open(out_path, 'wb') as f:
-                    f.write(json.dumps(entry))
-
-                self.log_data = scraper.log_data
-
-                # write the updated log
-                with open(self.log_path, 'wb') as f:
-                    f.write(json.dumps(self.log_data))
+            # write the updated log
+            with open(self.log_path, 'wb') as f:
+                f.write(json.dumps(self.log_data))
 
     def append_parsed(self):
         import _country_parsers_annual
@@ -199,9 +192,21 @@ class DataManager:
             self.log_data[country] = []
 
             os.path.join(self.data_path, 'Legislation', country.strip('_'))
-            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_')))
-            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Annual'))
-            os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Consolidated'))
+
+            try:
+                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_')))
+            except OSError:
+                pass
+
+            try:
+                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Annual'))
+            except OSError:
+                pass
+
+            try:
+                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Consolidated'))
+            except OSError:
+                pass
 
 
 class Visualize:

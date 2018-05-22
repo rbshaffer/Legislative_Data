@@ -14,6 +14,9 @@ class _CountryBase:
         self.log_data = log_data
         self.country = country
 
+        if 'Annual' not in self.log_data:
+            self.log_data['Annual'] = {}
+
         for id_val in self._get_ids():
             if id_val not in self.log_data['Annual'][self.country] and id_val is not None:
                 self.new_ids.append(id_val)

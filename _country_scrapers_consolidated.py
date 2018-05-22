@@ -16,13 +16,21 @@ class _CountryBase:
         self.country = country
         self.data_path = _os.path.join(base_path, country, 'Consolidated')
 
-    def iter_data(self):
+        if 'Consolidated' not in self.log_data:
+            self.log_data['Consolidated'] = {}
+
         for id_val in self._get_version_ids():
             if id_val not in self.log_data['Consolidated']:
-                print(id_val)
-                self._get_code_version(id_val)
-
                 self.new_ids.append(id_val)
+
+    def update_code(self):
+        for id_val in self.new_ids:
+            print(id_val)
+
+            self._get_code_version(id_val)
+            self._extract_code(id_val)
+
+            self.log_data['Consolidated'][self.country].append(id_val)
 
     def _get_version_ids(self):
         return list()
@@ -41,20 +49,20 @@ class UnitedStates(_CountryBase):
 
         tags = [t for t in soup.find_all('a') if '.zip' in t['href']]
 
-        id_vals = [_re.search('[0-9]+', t['href']) for t in tags]
+        id_vals = [_re.search('[0-9]+', t['href']).group(0) for t in tags]
 
         return id_vals
 
     def _get_code_version(self, publication_id):
         dl_url = 'http://uscode.house.gov/download/annualhistoricalarchives/XHTML/' + publication_id + '.zip'
-        zip_path = _tempfile.gettempdir() + self.country + publication_id + '.zip'
-        unzip_folder = _os.path.join(_tempfile.gettempdir(), self.country + publication_id)
+        zip_path = _os.path.join(_tempfile.gettempdir(), self.country + publication_id + '.zip')
 
         _urllib.urlretrieve(dl_url, zip_path)
-        _os.mkdir(unzip_folder)
 
         with _zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(unzip_folder)
+            zip_ref.extractall(_tempfile.gettempdir())
+
+        _os.remove(zip_path)
 
     def _extract_code(self, publication_id):
         def section_parser(soup):
@@ -92,7 +100,7 @@ class UnitedStates(_CountryBase):
 
             return ch_data
 
-        temp_folder = _os.path.join(_tempfile.gettempdir(), self.country + publication_id)
+        temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
         chapters = [f for f in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', f)]
 
         current_chapters = _os.listdir(self.data_path)
@@ -112,3 +120,5 @@ class UnitedStates(_CountryBase):
 
             with open(_os.path.join(self.data_path, ch_name)) as f:
                 f.write(_json.dumps(chapter_data))
+
+        _os.rmdir(temp_folder)
