@@ -1,10 +1,12 @@
 import json as _json
-import tempfile as _tempfile
 import os as _os
 import re as _re
+import shutil as _shutil
+import tempfile as _tempfile
 import urllib as _urllib
 import urllib2 as _urllib2
 import zipfile as _zipfile
+
 from bs4 import BeautifulSoup as _BeautifulSoup
 
 
@@ -17,7 +19,7 @@ class _CountryBase:
         self.data_path = _os.path.join(base_path, 'Legislation', country, 'Consolidated')
 
         if 'Consolidated' not in self.log_data:
-            self.log_data['Consolidated'] = {}
+            self.log_data['Consolidated'] = {country: []}
 
         for id_val in self._get_version_ids():
             if id_val not in self.log_data['Consolidated']:
@@ -67,7 +69,10 @@ class UnitedStates(_CountryBase):
     def _extract_code(self, publication_id):
         def section_parser(soup):
             def num_search(tag):
-                return _re.search('[0-9]+[a-zA-Z]*\.', tag.text).group(0).lower().strip('.')
+                print(tag)
+                label = _re.search('\xa7([0-9]+[a-zA-Z]*)\.', tag.text).group(1).lower()
+                print(label)
+                return label
 
             section_head = soup.find('h3', class_='section-head')
             next_tag = section_head.find_next_sibling(['h3', 'p'])
@@ -91,8 +96,8 @@ class UnitedStates(_CountryBase):
 
             return out
 
-        def get_chapter(ch):
-            if ch in current_chapters:
+        def get_chapter(ch, chapter_list):
+            if ch in chapter_list:
                 with open(_os.path.join(self.data_path, ch)) as fname:
                     ch_data = _json.loads(fname)
             else:
@@ -101,16 +106,17 @@ class UnitedStates(_CountryBase):
             return ch_data
 
         temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
-        chapters = [f for f in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', f)]
+        chapters = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
 
         current_chapters = _os.listdir(self.data_path)
 
         for ch_name in chapters:
-            chapter_data = get_chapter(ch_name)
-
             with open(_os.path.join(temp_folder, ch_name)) as f:
                 chapter_soup = _BeautifulSoup(f.read())
                 sections = section_parser(chapter_soup)
+
+            ch_to_write = _re.sub('^[0-9]+usc', '', ch_name)
+            chapter_data = get_chapter(ch_to_write, current_chapters)
 
             for s in sections:
                 if s in chapter_data:
@@ -118,9 +124,9 @@ class UnitedStates(_CountryBase):
                 else:
                     chapter_data[s] = {publication_id: sections[s]}
 
-            to_write = _os.path.join(self.data_path, _re.sub('\.htm', '', ch_name), '.json')
+            to_write = _os.path.join(self.data_path, _re.sub('htm', 'json', ch_to_write))
 
             with open(to_write, 'w') as f:
                 f.write(_json.dumps(chapter_data))
 
-        _os.rmdir(temp_folder)
+        _shutil.rmtree(temp_folder)
