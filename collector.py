@@ -1,8 +1,7 @@
-import os
-import re
 import csv
 import json
-
+import os
+import re
 from datetime import datetime
 
 
@@ -24,7 +23,6 @@ class DataManager:
         else:
             self.data_path = os.path.join(self.wrk_dir, 'Legislative_Data')
             self.log_path = os.path.join(self.wrk_dir, 'Legislative_Data', 'log.json')
-
             if not os.path.exists(self.data_path):
                 os.mkdir(self.data_path)
                 os.mkdir(os.path.join(self.data_path, 'Legislation'))
@@ -95,7 +93,7 @@ class DataManager:
             print(country)
 
             self._initialize_folders(country)
-
+            print(self.log_data.keys())
             scraper = getattr(_country_scrapers_consolidated, country)(self.log_data, country, self.data_path)
             scraper.update_code()
 
@@ -160,7 +158,7 @@ class DataManager:
             file_list = os.listdir(country_dir)
 
             for file_name in file_list:
-                print re.sub('_', '/', file_name).strip('.json')
+                print(re.sub('_', '/', file_name).strip('.json'))
 
                 with open(country_dir + file_name, 'rb') as f:
                     content = json.loads(f.read())
@@ -188,25 +186,22 @@ class DataManager:
                 writer.writerows(out)
 
     def _initialize_folders(self, country):
-        if country not in self.log_data:
-            self.log_data[country] = []
+        base_country_path = os.path.join(self.data_path, 'Legislation', country.strip('_'))
 
-            os.path.join(self.data_path, 'Legislation', country.strip('_'))
+        try:
+            os.mkdir(base_country_path)
+        except OSError:
+            pass
 
-            try:
-                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_')))
-            except OSError:
-                pass
+        try:
+            os.mkdir(os.path.join(base_country_path, 'Annual'))
+        except OSError:
+            pass
 
-            try:
-                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Annual'))
-            except OSError:
-                pass
-
-            try:
-                os.mkdir(os.path.join(self.data_path, 'Legislation', country.strip('_'), 'Consolidated'))
-            except OSError:
-                pass
+        try:
+            os.mkdir(os.path.join(base_country_path, 'Consolidated'))
+        except OSError:
+            pass
 
 
 class Visualize:

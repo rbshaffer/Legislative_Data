@@ -22,7 +22,7 @@ class _CountryBase:
             self.log_data['Consolidated'] = {country: []}
 
         for id_val in self._get_version_ids():
-            if id_val not in self.log_data['Consolidated']:
+            if id_val not in self.log_data['Consolidated'][country]:
                 self.new_ids.append(id_val)
 
     def update_code(self):
@@ -70,29 +70,42 @@ class UnitedStates(_CountryBase):
         def section_parser(soup):
             def num_search(tag):
                 print(tag)
-                label = _re.search('\xa7([0-9]+[a-zA-Z]*)\.', tag.text).group(1).lower()
+                label = _re.search(u'^\s*\xa7([0-9]+[-\u2014\u2013a-zA-Z0-9]*)', tag.text).group(1).lower()
                 print(label)
                 return label
 
-            section_head = soup.find('h3', class_='section-head')
-            next_tag = section_head.find_next_sibling(['h3', 'p'])
+            out = {}
 
-            section_number = num_search(section_head)
+            headers_to_exclude = ['omitted', 'repealed', 'transferred', 'renumbered', 'vacant']
 
-            out = {section_number: []}
+            section_head = soup.find('h3',
+                                     class_='section-head',
+                                     text=lambda text: text and
+                                                       all([excl not in text.lower()
+                                                            for excl in headers_to_exclude]) and
+                                                       _re.search('^\s*\xa7{1}', text))
 
-            while next_tag:
-                if 'class' in next_tag.attrs and 'section-head' in next_tag['class'][0]:
-                    section_head = next_tag
-                    section_number = num_search(section_head)
+            if section_head:
+                next_tag = section_head.find_next_sibling(['h3', 'p'])
+                section_number = num_search(section_head)
 
-                    out[section_number] = []
+                out[section_number] = []
 
-                else:
-                    if 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]:
+                while next_tag:
+                    header_bool = 'class' in next_tag.attrs and 'section-head' in next_tag['class'][0] and \
+                                  all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) and \
+                                  _re.search('^\s*\xa7{1}', next_tag.text)
+
+                    if header_bool:
+                        section_head = next_tag
+                        section_number = num_search(section_head)
+
+                        out[section_number] = []
+
+                    elif 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]:
                         out[section_number].append(next_tag.text)
 
-                next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                    next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
             return out
 
