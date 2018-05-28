@@ -83,7 +83,7 @@ class UnitedStates(_CountryBase):
                                      text=lambda text: text and
                                                        all([excl not in text.lower()
                                                             for excl in headers_to_exclude]) and
-                                                       _re.search('^\s*\xa7{1}', text))
+                                                       _re.search('^\s*\xa7[^\xa7]', text))
 
             if section_head:
                 next_tag = section_head.find_next_sibling(['h3', 'p'])
@@ -92,27 +92,40 @@ class UnitedStates(_CountryBase):
                 out[section_number] = []
 
                 while next_tag:
-                    header_bool = 'class' in next_tag.attrs and 'section-head' in next_tag['class'][0] and \
-                                  all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) and \
-                                  _re.search('^\s*\xa7{1}', next_tag.text)
+                    # boolean checks for various cases
+                    header_bool = 'class' in next_tag.attrs and 'section-head' in next_tag['class'][0]
+                    valid_header_bool = all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) and \
+                                        _re.search('^\s*\xa7[^\xa7]', next_tag.text)
+                    par_bool = 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]
 
-                    if header_bool:
+                    if header_bool and valid_header_bool:
+                        # if header and the header is valid, create a new entry and advance to the next tag
                         section_head = next_tag
                         section_number = num_search(section_head)
 
                         out[section_number] = []
 
-                    elif 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]:
-                        out[section_number].append(next_tag.text)
+                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                    next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                    elif header_bool:
+                        # if invalid header, skip to the next header
+                        next_tag = next_tag.find_next_sibling('h3')
+
+                    elif par_bool:
+                        # if valid statutory paragraph, add to the current entry and advance to the next tag
+                        out[section_number].append(next_tag.text)
+                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
+
+                    else:
+                        # otherwise, just advance
+                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
             return out
 
         def get_chapter(ch, chapter_list):
             if ch in chapter_list:
-                with open(_os.path.join(self.data_path, ch)) as fname:
-                    ch_data = _json.loads(fname)
+                with open(_os.path.join(self.data_path, ch)) as f:
+                    ch_data = _json.loads(f.read())
             else:
                 ch_data = {}
 
@@ -129,6 +142,8 @@ class UnitedStates(_CountryBase):
                 sections = section_parser(chapter_soup)
 
             ch_to_write = _re.sub('^[0-9]+usc', '', ch_name)
+            ch_to_write = _re.sub('\.htm', '.json', ch_to_write)
+
             chapter_data = get_chapter(ch_to_write, current_chapters)
 
             for s in sections:
@@ -137,8 +152,7 @@ class UnitedStates(_CountryBase):
                 else:
                     chapter_data[s] = {publication_id: sections[s]}
 
-            to_write = _os.path.join(self.data_path, _re.sub('htm', 'json', ch_to_write))
-
+            to_write = _os.path.join(self.data_path, ch_to_write)
             with open(to_write, 'w') as f:
                 f.write(_json.dumps(chapter_data))
 

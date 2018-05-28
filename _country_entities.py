@@ -1,6 +1,4 @@
-import re
-import nltk
-import string
+import nltk as _nltk
 
 
 class _EntityBase:
@@ -25,9 +23,6 @@ class _EntityBase:
 
     def get_chunks(self, parsed):
         return []
-
-    def process_entity(self, entity):
-        return entity
 
     def do_entity_extraction(self, parsed):
         """ Somewhat complex function to actually do the entity extraction. """
@@ -150,8 +145,8 @@ class _EntityBase:
     @staticmethod
     def process_doc(document):
 
-        sentences = nltk.sent_tokenize(document)
-        sentences = [nltk.word_tokenize(sent) for sent in sentences]
+        sentences = _nltk.sent_tokenize(document)
+        sentences = [_nltk.word_tokenize(sent) for sent in sentences]
 
         return sentences
 
@@ -159,14 +154,6 @@ class _EntityBase:
 class UnitedStates(_EntityBase):
     def __init__(self, load_lstm=True):
         _EntityBase.__init__(self, load_lstm)
-
-        self.white_list = ['Secretary', 'Committee', 'Congress', 'Service', 'Council', 'Board', 'Senator',
-                           'Representative', 'Institute', 'Director', 'Office', 'Chairman',
-                           'President', 'Fund', 'Officer', 'Association', 'Department', 'State', 'Foundation', 'Center',
-                           'Centers', 'Senate', 'House', 'Commission', 'Agency', 'Court', 'Tribunal', 'Survey',
-                           'Institutes', 'Comptroller', 'Forces', 'Superintendent', 'Inspector', 'Government']
-        self.black_list = ['act', 'code', 'amendments', 'document', 'amendment', 'statute', 'law', 'building',
-                           'circular']
 
     def get_chunks(self, parsed):
         i = 0
@@ -183,19 +170,3 @@ class UnitedStates(_EntityBase):
                 chunks[i].strip()
 
         return chunks
-
-    def process_entity(self, entity):
-
-        entity_str = [w[0].strip(string.punctuation) for w in entity]
-        entity_str = [w for w in entity_str if len(w) > 0]
-
-        out = [w.lower() for w in entity_str if w.lower() not in self.stopwords]
-
-        if (any([w in self.white_list for w in out]) or ' '.join(out) in self.white_list) and \
-                all([w not in self.black_list for w in out]) and \
-                re.search('[a-z]', ' '.join(entity_str)):
-
-            return ' '.join(out)
-
-        else:
-            return None
