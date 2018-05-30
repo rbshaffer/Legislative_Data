@@ -142,7 +142,7 @@ class DataManager:
             appender.add_auxiliary()
 
     def extract_entities(self, write=True):
-        import _country_entities
+        import _country_entities_annual
 
         countries = ['UnitedStates']
 
@@ -152,7 +152,7 @@ class DataManager:
         out = []
 
         for country in countries:
-            parser = getattr(_country_entities, country)()
+            parser = getattr(_country_entities_annual, country)()
 
             country_dir = base_dir.format(country)
             file_list = os.listdir(country_dir)
@@ -206,14 +206,14 @@ class DataManager:
 
 class Visualize:
     def __init__(self, wrk_dir, country):
-        import _country_entities
+        import _country_entities_annual
 
         # some test examples
         # file_name = '111th-congress_house-bill_1.json'
         # file_name = '111th-congress_senate-bill_1707.json'
 
         self.wrk_dir = wrk_dir.rstrip(os.sep)
-        self.parser = getattr(_country_entities, country)()
+        self.parser = getattr(_country_entities_annual, country)()
 
         self.G = None
         self.edges = None

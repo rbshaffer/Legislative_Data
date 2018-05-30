@@ -67,62 +67,71 @@ class UnitedStates(_CountryBase):
         _os.remove(zip_path)
 
     def _extract_code(self, publication_id):
-        def section_parser(soup):
-            def num_search(tag):
+        def parser(soup):
+            def section_num_search(tag):
                 print(tag)
                 label = _re.search(u'^\s*\xa7([0-9]+[-\u2014\u2013a-zA-Z0-9]*)', tag.text).group(1).lower()
                 print(label)
                 return label
 
-            out = {}
+            def chapter_num_search(tag):
+                print(tag)
+                label = _re.search(u'chapter ([0-9a-z]+)', tag.text.lower()).group(1)
+                print(label)
+                return label
 
             headers_to_exclude = ['omitted', 'repealed', 'transferred', 'renumbered', 'vacant']
+            next_tag = soup.find('h3', class_='chapter-head')
+            out = {}
 
-            section_head = soup.find('h3',
-                                     class_='section-head',
-                                     text=lambda text: text and
-                                                       all([excl not in text.lower()
-                                                            for excl in headers_to_exclude]) and
-                                                       _re.search('^\s*\xa7[^\xa7]', text))
+            if next_tag:
+                chapter_num = chapter_num_search(next_tag)
+                next_tag = next_tag.find_next_sibling('h3',
+                                                      class_='section-head',
+                                                      text=lambda text: text and
+                                                                        all([excl not in text.lower()
+                                                                             for excl in headers_to_exclude])
+                                                                        and _re.search('^\s*\xa7[^\xa7]', text))
+                if next_tag:
+                    section_num = section_num_search(next_tag)
+                    next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-            if section_head:
-                next_tag = section_head.find_next_sibling(['h3', 'p'])
-                section_number = num_search(section_head)
+                    out[chapter_num] = {section_num: []}
 
-                out[section_number] = []
+                    while next_tag:
+                        chapter_bool = 'class' in next_tag.attrs and next_tag['class'][0] == 'chapter-head' and \
+                                       next_tag.find('strong') and not next_tag.find(
+                            'sup') and 'CHAPTERS' not in next_tag.text
+                        section_bool = 'class' in next_tag.attrs and next_tag['class'][0] == 'section-head'
+                        valid_section_bool = all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) \
+                                             and _re.search('^\s*\xa7[^\xa7]', next_tag.text)
+                        par_bool = 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]
 
-                while next_tag:
-                    # boolean checks for various cases
-                    header_bool = 'class' in next_tag.attrs and 'section-head' in next_tag['class'][0]
-                    valid_header_bool = all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) and \
-                                        _re.search('^\s*\xa7[^\xa7]', next_tag.text)
-                    par_bool = 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]
+                        if chapter_bool:
+                            chapter_num = chapter_num_search(next_tag)
+                            out[chapter_num] = {}
 
-                    if header_bool and valid_header_bool:
-                        # if header and the header is valid, create a new entry and advance to the next tag
-                        section_head = next_tag
-                        section_number = num_search(section_head)
+                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                        out[section_number] = []
+                        elif section_bool:
+                            if valid_section_bool:
+                                section_num = section_num_search(next_tag)
+                                out[chapter_num][section_num] = []
+                                next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                            else:
+                                next_tag = next_tag.find_next_sibling('h3')
 
-                    elif header_bool:
-                        # if invalid header, skip to the next header
-                        next_tag = next_tag.find_next_sibling('h3')
+                        elif par_bool:
+                            out[chapter_num][section_num].append(next_tag.text)
+                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                    elif par_bool:
-                        # if valid statutory paragraph, add to the current entry and advance to the next tag
-                        out[section_number].append(next_tag.text)
-                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                        else:
+                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                    else:
-                        # otherwise, just advance
-                        next_tag = next_tag.find_next_sibling(['h3', 'p'])
+            return (out)
 
-            return out
-
-        def get_chapter(ch, chapter_list):
+        def get_title(ch, chapter_list):
             if ch in chapter_list:
                 with open(_os.path.join(self.data_path, ch)) as f:
                     ch_data = _json.loads(f.read())
@@ -132,28 +141,33 @@ class UnitedStates(_CountryBase):
             return ch_data
 
         temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
-        chapters = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
+        titles = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
 
-        current_chapters = _os.listdir(self.data_path)
+        current_titles = _os.listdir(self.data_path)
 
-        for ch_name in chapters:
-            with open(_os.path.join(temp_folder, ch_name)) as f:
-                chapter_soup = _BeautifulSoup(f.read())
-                sections = section_parser(chapter_soup)
+        for title in titles:
+            with open(_os.path.join(temp_folder, title)) as f:
+                title_soup = _BeautifulSoup(f.read())
+                parsed = parser(title_soup)
 
-            ch_to_write = _re.sub('^[0-9]+usc', '', ch_name)
-            ch_to_write = _re.sub('\.htm', '.json', ch_to_write)
+            title_to_write = _re.sub('^[0-9]+usc', '', title)
+            title_to_write = _re.sub('\.htm', '.json', title_to_write)
 
-            chapter_data = get_chapter(ch_to_write, current_chapters)
+            title_data = get_title(title_to_write, current_titles)
 
-            for s in sections:
-                if s in chapter_data:
-                    chapter_data[s][publication_id] = sections[s]
+            for chapter in parsed:
+                if chapter in title_data:
+                    for section in parsed[chapter]:
+                        if section in title_data[chapter]:
+                            title_data[chapter][section][publication_id] = parsed[chapter][section]
+                        else:
+                            title_data[chapter][section] = {publication_id: parsed[chapter][section]}
                 else:
-                    chapter_data[s] = {publication_id: sections[s]}
+                    title_data[chapter] = {section: {publication_id: parsed[chapter][section]}
+                                           for section in parsed[chapter]}
 
-            to_write = _os.path.join(self.data_path, ch_to_write)
+            to_write = _os.path.join(self.data_path, title_to_write)
             with open(to_write, 'w') as f:
-                f.write(_json.dumps(chapter_data))
+                f.write(_json.dumps(title_data))
 
         _shutil.rmtree(temp_folder)

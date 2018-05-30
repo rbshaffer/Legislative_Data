@@ -4,9 +4,6 @@ import nltk as _nltk
 class _EntityBase:
     def __init__(self, load_lstm):
 
-        self.white_list = []
-        self.black_list = []
-
         import sys
 
         if load_lstm:
@@ -151,7 +148,7 @@ class _EntityBase:
         return sentences
 
 
-class UnitedStates(_EntityBase):
+class UnitedStatesAnnual(_EntityBase):
     def __init__(self, load_lstm=True):
         _EntityBase.__init__(self, load_lstm)
 
@@ -170,3 +167,8 @@ class UnitedStates(_EntityBase):
                 chunks[i].strip()
 
         return chunks
+
+
+class UnitedStatesConsolidated(_EntityBase):
+    def __init__(self, load_lstm=True):
+        _EntityBase.__init__(self, load_lstm)
