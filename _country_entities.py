@@ -76,10 +76,6 @@ class _EntityBase:
                         # this condition shouldn't be necessary - need to figure out why this is happening
                         entities[-1].append(sent[i])
 
-                    #elif sent[i] in self.white_list and any([sent[i] in e.split() for e in all_entities]):
-                    #    matches = [e for e in all_entities if sent[i] in e.split()]
-                    #    entities.append([matches[-1]])
-
                 new_entities = [' '.join(e) for e in entities]
                 new_entities = ['\n'.join(textwrap.wrap(e.strip(), 20)) for e in new_entities]
 
@@ -172,3 +168,12 @@ class UnitedStatesAnnual(_EntityBase):
 class UnitedStatesConsolidated(_EntityBase):
     def __init__(self, load_lstm=True):
         _EntityBase.__init__(self, load_lstm)
+
+    def get_chunks(self, parsed):
+        chunks = ['']
+
+        for section in parsed:
+            chunk = ' '.join(parsed[section])
+            chunks.append(chunk)
+
+        return chunks

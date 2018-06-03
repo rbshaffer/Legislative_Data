@@ -1,3 +1,5 @@
+import cStringIO
+import codecs
 import csv
 import json
 import os
@@ -141,18 +143,19 @@ class DataManager:
             appender = getattr(_country_auxiliary_annual, country)(file_list, aux_dir, country)
             appender.add_auxiliary()
 
-    def extract_entities(self, write=True):
-        import _country_entities_annual
+    def extract_entities_annual(self, write=True):
+        import _country_entities
 
-        countries = ['UnitedStates']
+        # change here as necessary to implement more countries later
+        countries = ['UnitedStatesAnnual']
 
         base_dir = os.path.join(self.data_path, 'Legislation', '{0}', 'Annual')
-        out_path = os.path.join(self.data_path, 'Out', 'out.csv')
+        out_path = os.path.join(self.data_path, 'Out', 'out_annual.csv')
 
         out = []
 
         for country in countries:
-            parser = getattr(_country_entities_annual, country)()
+            parser = getattr(_country_entities, country)()
 
             country_dir = base_dir.format(country)
             file_list = os.listdir(country_dir)
@@ -185,6 +188,84 @@ class DataManager:
                 writer.writeheader()
                 writer.writerows(out)
 
+    def extract_entities_consolidated(self, write=True):
+        from networkx.readwrite import json_graph
+        import _country_entities
+
+        # change here as necessary to implement more countries later
+        countries = ['UnitedStatesConsolidated']
+
+        # update if more years are added
+        years = [str(yr) for yr in range(1994, 2018)]
+
+        base_dir = os.path.join(self.data_path, 'Legislation', '{0}', 'Consolidated')
+        out_dir = os.path.join(self.data_path, 'Out')
+
+        out_path = os.path.join(out_dir, 'out_consolidated.csv')
+
+        fieldnames = ['id', 'date', 'title', 'clustering', 'total_nodes', 'total_edges', 'average_degree']
+
+        out = []
+
+        for country in countries:
+            entity_parser = getattr(_country_entities, country)()
+
+            country = re.sub('Consolidated', '', country)
+            country_dir = base_dir.format(country)
+            title_list = os.listdir(country_dir)
+
+            for title in title_list:
+                print('Title: ' + title)
+
+                title_dir = os.path.join(country_dir, title)
+                chapter_list = os.listdir(title_dir)
+
+                previous_chapter_id = None
+                entities_data = {}
+
+                for chapter_file in sorted(chapter_list):
+                    chapter_id, year = re.search('(.*?)_([0-9]{4})', chapter_file).groups()
+
+                    chapter_path = os.path.join(title_dir, chapter_file)
+                    with open(chapter_path, 'rb') as f:
+                        current_chapter = json.loads(f.read())
+
+                    if current_chapter['parsed']:
+                        if chapter_id != previous_chapter_id:
+                            previous_chapter_id = chapter_id
+                            entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+                        else:
+                            previous_chapter_path = os.path.join(title_dir,
+                                                                 '_'.join([chapter_id, str(int(year) - 1)]) + '.json')
+                            if os.path.isfile(previous_chapter_path):
+                                with open(previous_chapter_path, 'rb') as f:
+                                    previous_chapter = json.loads(f.read())
+
+                                # implicitly leaves entity data the same as the previous step if text unchanged
+                                if previous_chapter['parsed'] != current_chapter['parsed']:
+                                    entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+
+                            else:
+                                entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+
+                        current_chapter.update({k: str(entities_data[k]) for k in fieldnames
+                                                if k not in current_chapter})
+                        out.append({k: current_chapter[k] for k in current_chapter if k in fieldnames})
+
+                        graph_dir = os.path.join(out_dir, 'consolidated_graphs', title)
+                        if not os.path.isdir(graph_dir):
+                            os.makedirs(graph_dir)
+
+                        with open(os.path.join(graph_dir, chapter_id + '_' + year + '.json'), 'w') as f:
+                            f.write(json.dumps(json_graph.adjacency_data(entities_data['graph'])))
+
+        if write:
+            with open(out_path, 'wb') as f:
+                writer = DictUnicodeWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(out)
+
+
     def _initialize_folders(self, country):
         base_country_path = os.path.join(self.data_path, 'Legislation', country.strip('_'))
 
@@ -206,14 +287,14 @@ class DataManager:
 
 class Visualize:
     def __init__(self, wrk_dir, country):
-        import _country_entities_annual
+        import _country_entities
 
         # some test examples
         # file_name = '111th-congress_house-bill_1.json'
         # file_name = '111th-congress_senate-bill_1707.json'
 
         self.wrk_dir = wrk_dir.rstrip(os.sep)
-        self.parser = getattr(_country_entities_annual, country)()
+        self.parser = getattr(_country_entities, country)()
 
         self.G = None
         self.edges = None
@@ -260,3 +341,31 @@ class Visualize:
         # raw_input('')
         # plt.close()
         plt.savefig("/home/rbshaffer/Desktop/fig1.pdf", dpi=500)
+
+
+class DictUnicodeWriter(object):
+    def __init__(self, f, fieldnames, dialect=csv.excel, encoding="utf-8", **kwds):
+        # Redirect output to a queue
+        self.queue = cStringIO.StringIO()
+        self.writer = csv.DictWriter(self.queue, fieldnames, dialect=dialect, **kwds)
+        self.stream = f
+        self.encoder = codecs.getincrementalencoder(encoding)()
+
+    def writerow(self, D):
+        self.writer.writerow({k: v.encode("utf-8") for k, v in D.items()})
+        # Fetch UTF-8 output from the queue ...
+        data = self.queue.getvalue()
+        data = data.decode("utf-8")
+        # ... and reencode it into the target encoding
+        data = self.encoder.encode(data)
+        # write to the target stream
+        self.stream.write(data)
+        # empty queue
+        self.queue.truncate(0)
+
+    def writerows(self, rows):
+        for D in rows:
+            self.writerow(D)
+
+    def writeheader(self):
+        self.writer.writeheader()

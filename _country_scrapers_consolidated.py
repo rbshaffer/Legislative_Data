@@ -69,23 +69,27 @@ class UnitedStates(_CountryBase):
     def _extract_code(self, publication_id):
         def parser(soup):
             def section_num_search(tag):
-                print(tag)
-                label = _re.search(u'^\s*\xa7([0-9]+[-\u2014\u2013a-zA-Z0-9]*)', tag.text).group(1).lower()
-                print(label)
-                return label
+                id_val = _re.search(u'^\s*\xa7([0-9]+[-\u2014\u2013a-zA-Z0-9]*)', tag.text).group(1).lower()
+                return {'id': id_val}
 
             def chapter_num_search(tag):
                 print(tag)
-                label = _re.search(u'chapter ([0-9a-z]+)', tag.text.lower()).group(1)
-                print(label)
-                return label
+                regex = _re.search(u'chapter ([0-9a-z]+)\u2014?(.*)', tag.text.lower())
+                id_val = regex.group(1)
+                name = regex.group(2)
+                return {'id': id_val, 'name': name}
 
             headers_to_exclude = ['omitted', 'repealed', 'transferred', 'renumbered', 'vacant']
             next_tag = soup.find('h3', class_='chapter-head')
-            out = {}
+
+            out = []
+            i = 0
 
             if next_tag:
-                chapter_num = chapter_num_search(next_tag)
+                chapter_regex = chapter_num_search(next_tag)
+                chapter_name = chapter_regex['name']
+                chapter_id = chapter_regex['id']
+
                 next_tag = next_tag.find_next_sibling('h3',
                                                       class_='section-head',
                                                       text=lambda text: text and
@@ -93,10 +97,14 @@ class UnitedStates(_CountryBase):
                                                                              for excl in headers_to_exclude])
                                                                         and _re.search('^\s*\xa7[^\xa7]', text))
                 if next_tag:
-                    section_num = section_num_search(next_tag)
+                    section_regex = section_num_search(next_tag)
+                    section_id = section_regex['id']
+
                     next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-                    out[chapter_num] = {section_num: []}
+                    out.append({'name': chapter_name,
+                                'id': chapter_id,
+                                'parsed': {section_id: []}})
 
                     while next_tag:
                         chapter_bool = 'class' in next_tag.attrs and next_tag['class'][0] == 'chapter-head' and \
@@ -108,66 +116,65 @@ class UnitedStates(_CountryBase):
                         par_bool = 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]
 
                         if chapter_bool:
-                            chapter_num = chapter_num_search(next_tag)
-                            out[chapter_num] = {}
+                            i += 1
+
+                            chapter_regex = chapter_num_search(next_tag)
+                            chapter_name = chapter_regex['name']
+                            chapter_id = chapter_regex['id']
+
+                            out.append({'name': chapter_name,
+                                        'id': chapter_id,
+                                        'parsed': {}})
 
                             next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
                         elif section_bool:
                             if valid_section_bool:
-                                section_num = section_num_search(next_tag)
-                                out[chapter_num][section_num] = []
+                                section_regex = section_num_search(next_tag)
+                                section_id = section_regex['id']
+
+                                out[i]['parsed'][section_id] = []
+
                                 next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
                             else:
                                 next_tag = next_tag.find_next_sibling('h3')
 
                         elif par_bool:
-                            out[chapter_num][section_num].append(next_tag.text)
+                            out[i]['parsed'][section_id].append(next_tag.text)
                             next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
                         else:
                             next_tag = next_tag.find_next_sibling(['h3', 'p'])
 
-            return (out)
-
-        def get_title(ch, chapter_list):
-            if ch in chapter_list:
-                with open(_os.path.join(self.data_path, ch)) as f:
-                    ch_data = _json.loads(f.read())
-            else:
-                ch_data = {}
-
-            return ch_data
+            return out
 
         temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
         titles = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
 
-        current_titles = _os.listdir(self.data_path)
-
         for title in titles:
             with open(_os.path.join(temp_folder, title)) as f:
                 title_soup = _BeautifulSoup(f.read())
-                parsed = parser(title_soup)
 
-            title_to_write = _re.sub('^[0-9]+usc', '', title)
-            title_to_write = _re.sub('\.htm', '.json', title_to_write)
+            title_parsed = parser(title_soup)
 
-            title_data = get_title(title_to_write, current_titles)
+            title_id = _re.sub('^[0-9]+usc|\.htm', '', title)
+            title_folder = _os.path.join(self.data_path, title_id)
+            if not _os.path.isdir(title_folder):
+                _os.mkdir(title_folder)
 
-            for chapter in parsed:
-                if chapter in title_data:
-                    for section in parsed[chapter]:
-                        if section in title_data[chapter]:
-                            title_data[chapter][section][publication_id] = parsed[chapter][section]
-                        else:
-                            title_data[chapter][section] = {publication_id: parsed[chapter][section]}
-                else:
-                    title_data[chapter] = {section: {publication_id: parsed[chapter][section]}
-                                           for section in parsed[chapter]}
+            for chapter in title_parsed:
+                out_name = '_'.join([chapter['id'], publication_id]) + '.json'
+                out_path = _os.path.join(self.data_path, title_id, out_name)
 
-            to_write = _os.path.join(self.data_path, title_to_write)
-            with open(to_write, 'w') as f:
-                f.write(_json.dumps(title_data))
+                to_write = {'country': u'united_states',
+                            'date': publication_id,
+                            'id': u'_'.join([title_id, chapter['id']]),
+                            'type': u'consolidated',
+                            'title': chapter['name'],
+                            'parsed': chapter['parsed']}
+
+                with open(out_path, 'w') as f:
+                    f.write(_json.dumps(to_write))
 
         _shutil.rmtree(temp_folder)
