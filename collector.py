@@ -257,7 +257,10 @@ class DataManager:
                             os.makedirs(graph_dir)
 
                         with open(os.path.join(graph_dir, chapter_id + '_' + year + '.json'), 'w') as f:
-                            f.write(json.dumps(json_graph.adjacency_data(entities_data['graph'])))
+                            if entities_data['graph']:
+                                f.write(json.dumps(json_graph.adjacency_data(entities_data['graph'])))
+                            else:
+                                f.write('')
 
         if write:
             with open(out_path, 'wb') as f:

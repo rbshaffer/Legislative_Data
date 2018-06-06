@@ -1,7 +1,9 @@
-import re
-import os
 import codecs
+import os
+import re
+
 from constitute_tools import parser
+
 
 class _CountryBase:
 
@@ -26,7 +28,13 @@ class UnitedStates(_CountryBase):
             return []
         else:
             cleaned = re.sub('\.--', '<title>\n', self.content['html'])
-            cleaned = re.sub('``.*?\'\'|`.*?\'', '<snip>', cleaned, flags=re.DOTALL)
+
+            # old version - chopped all amending language
+            # cleaned = re.sub('``.*?\'\'|`.*?\'', '<snip>', cleaned, flags=re.DOTALL)
+
+            # new version - keeps amendments, splits them into new sections
+            cleaned = re.sub('``(?=SECTION|SEC)', '', cleaned)
+
             cleaned = parser.clean_text(cleaned)
 
             start = re.search('(Be it enacted.*?)(SECTION|SEC\.)', cleaned, re.DOTALL)
@@ -48,10 +56,22 @@ class UnitedStates(_CountryBase):
 
             if re.search(header_regex[0], cleaned) is None:
                 raw_input('FAILED PARSE')
-                return []
+                out = []
             else:
                 manager = parser.HierarchyManager(temp_path, header_regex, case_sensitive=True)
                 manager.parse()
 
                 out = manager.create_output('ccp')
-                return out
+
+            # this chops all content that comes before the first section not labeled SECTION 1
+            # effectively removes definitions and TOC-type sections (which always come in the first section
+            if out:
+                i = 0
+
+                for i, row in enumerate(out):
+                    if row[4] == 'title' and all([s != row[2] for s in ['SECTION 1', 'SEC. 1', 'SEC 1']]):
+                        break
+
+                out = out[i:]
+
+            return out
