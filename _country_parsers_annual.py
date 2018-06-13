@@ -69,7 +69,7 @@ class UnitedStates(_CountryBase):
                 i = 0
 
                 for i, row in enumerate(out):
-                    if row[4] == 'title' and all([s != row[2] for s in ['SECTION 1', 'SEC. 1', 'SEC 1']]):
+                    if 'SEC' in row[2] and all([s != row[2] for s in ['SECTION 1', 'SEC. 1', 'SEC 1']]):
                         break
 
                 out = out[i:]

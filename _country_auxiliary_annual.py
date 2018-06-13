@@ -6,7 +6,7 @@ class _AuxiliaryBase:
         import os
         self.file_list = file_list
         self.country = country
-        self.aux_files = [aux_path + f for f in os.listdir(aux_path) if self.country in f]
+        self.aux_files = [os.path.join(aux_path, f) for f in os.listdir(aux_path) if self.country in f]
 
     def add_auxiliary(self):
         import re
@@ -137,7 +137,8 @@ class UnitedStates(_AuxiliaryBase):
                 president_party = '0'
 
             return {'sponsor_party': party, 'sponsor_majority': majority_member, 'dw': dw_nom, 'control': control,
-                    'topic': topic, 'commemorative': commemorative, 'president_party': president_party, 'date': date}
+                    'topic': topic, 'commemorative': commemorative, 'president_party': president_party,
+                    'date': date.strftime('%m/%d/%Y')}
 
         def get_year(x):
             return [datetime.strptime('01/01/' + x, '%d/%m/%Y') + timedelta(y)
@@ -150,12 +151,11 @@ class UnitedStates(_AuxiliaryBase):
         divided = list(chain(*[get_year(year) for year in ['1973', '1974', '1975', '1976', '1981', '1982', '1983',
                                                            '1984', '1985', '1986', '1987', '1988', '1989', '1990',
                                                            '1991', '1992', '1995', '1996', '1997', '1998', '1999',
-                                                           '2000', '2001', '2002', '2003', '2004', '2005', '2006',
-                                                           '2007', '2008', '2011', '2012', '2013', '2014', '2015',
-                                                           '2016']]))
+                                                           '2000', '2001', '2002', '2007', '2008', '2011', '2012',
+                                                           '2013', '2014', '2015', '2016']]))
 
-        unified = list(chain(*[get_year(year) for year in ['1977', '1978', '1979', '1980', '1993', '1994', '2009',
-                                                           '2010']]))
+        unified = list(chain(*[get_year(year) for year in ['1977', '1978', '1979', '1980', '1993', '1994', '2003',
+                                                           '2004', '2005', '2006', '2009', '2010']]))
 
         house_dem_majority = list(chain(*[get_year(year) for year in ['1973', '1974', '1975', '1976', '1977', '1978',
                                                                       '1979', '1980', '1981', '1982', '1983', '1984',

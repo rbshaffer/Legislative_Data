@@ -119,7 +119,7 @@ class DataManager:
             file_list = os.listdir(country_dir)
 
             for file_name in file_list:
-                full_path = country_dir + file_name
+                full_path = os.path.join(country_dir, file_name)
                 with open(full_path, 'rb') as f:
                     content = json.loads(f.read())
 
@@ -138,7 +138,7 @@ class DataManager:
 
         for country in countries:
             country_path = base_dir.format(country)
-            file_list = [country_path + f for f in os.listdir(country_path)]
+            file_list = [os.path.join(country_path, f) for f in os.listdir(country_path) if 'resolution' not in f]
 
             appender = getattr(_country_auxiliary_annual, country)(file_list, aux_dir, country)
             appender.add_auxiliary()
@@ -157,20 +157,20 @@ class DataManager:
         for country in countries:
             parser = getattr(_country_entities, country)()
 
-            country_dir = base_dir.format(country)
-            file_list = os.listdir(country_dir)
+            country_dir = base_dir.format(re.sub('Annual', '', country))
+            file_list = [os.path.join(country_dir, f) for f in os.listdir(country_dir) if 'resolution' not in f]
 
             for file_name in file_list:
                 print(re.sub('_', '/', file_name).strip('.json'))
 
-                with open(country_dir + file_name, 'rb') as f:
+                with open(file_name, 'rb') as f:
                     content = json.loads(f.read())
 
                     if content['parsed']:
                         parsed = parser.do_entity_extraction(content['parsed'])
 
                         keys_to_add = ['total_nodes', 'total_edges', 'clustering', 'average_degree']
-                        null_keys = ['n_cosponsors', 'hearings', 'referred']
+                        null_keys = ['cosponsors', 'hearings', 'referred']
 
                         content.update({k: parsed[k] for k in keys_to_add})
                         content.update({k: len(content[k]) if content[k] else 0 for k in null_keys})
@@ -181,7 +181,7 @@ class DataManager:
             with open(out_path, 'wb') as f:
                 writer = csv.DictWriter(f, fieldnames=['id', 'date', 'title', 'clustering', 'total_nodes',
                                                        'total_edges', 'average_degree', 'topic', 'sponsor', 'dw',
-                                                       'sponsor_party', 'sponsor_majority', 'n_cosponsors',
+                                                       'sponsor_party', 'sponsor_majority', 'cosponsors',
                                                        'hearings', 'referred', 'control',
                                                        'president_party', 'commemorative'],
                                         extrasaction='ignore')
@@ -323,7 +323,7 @@ class Visualize:
             with open(out_path, 'w') as f:
                 csv.writer(f).writerows(self.edges)
 
-    def draw(self):
+    def draw(self, labels=True):
         import matplotlib.pyplot as plt
         import networkx as nx
 
@@ -337,8 +337,9 @@ class Visualize:
             edge_list = [[edge[0], edge[1]]]
             nx.draw_networkx_edges(self.G, pos, edgelist=edge_list, width=10*(edge[2]/m)**2, alpha=0.3,
                                    edge_color='b')
+        if labels:
+            nx.draw_networkx_labels(self.G, pos, font_size=10, font_family='sans-serif')
 
-        nx.draw_networkx_labels(self.G, pos, font_size=10, font_family='sans-serif')
         plt.axis('off')
         # plt.draw()
         # raw_input('')

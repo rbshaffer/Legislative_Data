@@ -90,17 +90,16 @@ class UnitedStates(_CountryBase):
                 chapter_name = chapter_regex['name']
                 chapter_id = chapter_regex['id']
 
-                next_tag = next_tag.find_next_sibling('h3',
-                                                      class_='section-head',
-                                                      text=lambda text: text and
-                                                                        all([excl not in text.lower()
-                                                                             for excl in headers_to_exclude])
-                                                                        and _re.search('^\s*\xa7[^\xa7]', text))
+                next_tag = next_tag.find_next('h3',
+                                              class_='section-head',
+                                              text=lambda text: text and all([excl not in text.lower() for
+                                                                              excl in headers_to_exclude])
+                                                                and _re.search('^\s*\xa7[^\xa7]', text))
                 if next_tag:
                     section_regex = section_num_search(next_tag)
                     section_id = section_regex['id']
 
-                    next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                    next_tag = next_tag.find_next(['h3', 'p'])
 
                     out.append({'name': chapter_name,
                                 'id': chapter_id,
@@ -126,7 +125,7 @@ class UnitedStates(_CountryBase):
                                         'id': chapter_id,
                                         'parsed': {}})
 
-                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                            next_tag = next_tag.find_next(['h3', 'p'])
 
                         elif section_bool:
                             if valid_section_bool:
@@ -135,17 +134,17 @@ class UnitedStates(_CountryBase):
 
                                 out[i]['parsed'][section_id] = []
 
-                                next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                                next_tag = next_tag.find_next(['h3', 'p'])
 
                             else:
-                                next_tag = next_tag.find_next_sibling('h3')
+                                next_tag = next_tag.find_next('h3')
 
                         elif par_bool:
                             out[i]['parsed'][section_id].append(next_tag.text)
-                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                            next_tag = next_tag.find_next(['h3', 'p'])
 
                         else:
-                            next_tag = next_tag.find_next_sibling(['h3', 'p'])
+                            next_tag = next_tag.find_next(['h3', 'p'])
 
             return out
 
