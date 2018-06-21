@@ -242,6 +242,7 @@ class DataManager:
                 entities_data = {}
 
                 for chapter_file in sorted(chapter_list):
+                    print(chapter_file)
                     chapter_id, year = re.search('(.*?)_([0-9]{4})', chapter_file).groups()
 
                     chapter_path = os.path.join(title_dir, chapter_file)
@@ -256,7 +257,7 @@ class DataManager:
                             previous_chapter_paths = [os.path.join(title_dir, '_'.join([chapter_id, str(yr)])) + '.json'
                                                       for yr in list(reversed(range(1994, int(year))))]
 
-                            entitites_data = None
+                            entitites_data = {}
 
                             for previous_chapter_path in previous_chapter_paths:
                                 if os.path.isfile(previous_chapter_path):
@@ -264,11 +265,12 @@ class DataManager:
                                         previous_chapter = json.loads(f.read())
 
                                     # implicitly leaves entity data the same as the previous step if text unchanged
-                                    if previous_chapter['parsed'] != current_chapter['parsed']:
-                                        entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+                                    if previous_chapter['parsed'] == current_chapter['parsed']:
+                                        current_chapter.update({k: out[-1][k] for k in fieldnames
+                                                                if k not in current_chapter})
                                         break
 
-                            if not entities_data:
+                            if not all([fieldname in current_chapter for fieldname in fieldnames]):
                                 entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
 
                         current_chapter.update({k: str(entities_data[k]) for k in fieldnames
