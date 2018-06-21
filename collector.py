@@ -163,8 +163,8 @@ class DataManager:
             for file_name in file_list:
                 print(re.sub('_', '/', file_name).strip('.json'))
 
-                with open(file_name, 'rb') as f:
-                    content = json.loads(f.read())
+                with open(file_name, 'rb') as in_f:
+                    content = json.loads(in_f.read())
 
                     if content['parsed']:
                         parsed = parser.do_entity_extraction(content['parsed'])
@@ -177,6 +177,24 @@ class DataManager:
 
                         out.append(content)
 
+                        # writing as output is generated for safety
+                        if write:
+                            with open(out_path, 'a') as out_f:
+                                writer = csv.DictWriter(out_f,
+                                                        fieldnames=['id', 'date', 'title', 'clustering', 'total_nodes',
+                                                                    'total_edges', 'average_degree', 'topic', 'sponsor',
+                                                                    'dw',
+                                                                    'sponsor_party', 'sponsor_majority', 'cosponsors',
+                                                                    'hearings', 'referred', 'control',
+                                                                    'president_party', 'commemorative'],
+                                                        extrasaction='ignore')
+
+                                if len(out) == 1:
+                                    writer.writeheader()
+
+                                writer.writerow(out[-1])
+
+        # overwriting the whole thing at the end - probably not necessary
         if write:
             with open(out_path, 'wb') as f:
                 writer = csv.DictWriter(f, fieldnames=['id', 'date', 'title', 'clustering', 'total_nodes',
@@ -235,17 +253,22 @@ class DataManager:
                             previous_chapter_id = chapter_id
                             entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
                         else:
-                            previous_chapter_path = os.path.join(title_dir,
-                                                                 '_'.join([chapter_id, str(int(year) - 1)]) + '.json')
-                            if os.path.isfile(previous_chapter_path):
-                                with open(previous_chapter_path, 'rb') as f:
-                                    previous_chapter = json.loads(f.read())
+                            previous_chapter_paths = [os.path.join(title_dir, '_'.join([chapter_id, str(yr)])) + '.json'
+                                                      for yr in list(reversed(range(1994, int(year))))]
 
-                                # implicitly leaves entity data the same as the previous step if text unchanged
-                                if previous_chapter['parsed'] != current_chapter['parsed']:
-                                    entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+                            entitites_data = None
 
-                            else:
+                            for previous_chapter_path in previous_chapter_paths:
+                                if os.path.isfile(previous_chapter_path):
+                                    with open(previous_chapter_path, 'rb') as f:
+                                        previous_chapter = json.loads(f.read())
+
+                                    # implicitly leaves entity data the same as the previous step if text unchanged
+                                    if previous_chapter['parsed'] != current_chapter['parsed']:
+                                        entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
+                                        break
+
+                            if not entities_data:
                                 entities_data = entity_parser.do_entity_extraction(current_chapter['parsed'])
 
                         current_chapter.update({k: str(entities_data[k]) for k in fieldnames

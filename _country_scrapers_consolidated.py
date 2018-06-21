@@ -25,6 +25,9 @@ class _CountryBase:
             if id_val not in self.log_data['Consolidated'][country]:
                 self.new_ids.append(id_val)
 
+        # change here later - 2017 not complete
+        self.new_ids = [id_val for id_val in self.new_ids if id_val != '2017']
+
     def update_code(self):
         for id_val in self.new_ids:
             print(id_val)
@@ -80,76 +83,88 @@ class UnitedStates(_CountryBase):
                 return {'id': id_val, 'name': name}
 
             headers_to_exclude = ['omitted', 'repealed', 'transferred', 'renumbered', 'vacant']
-            next_tag = soup.find('h3', class_='chapter-head')
+            # next_tag = soup.find('h3', text=lambda t: t and _re.search('chapter[^s]', t.lower()))
 
             out = []
-            i = 0
+            i = None
 
-            if next_tag:
-                chapter_regex = chapter_num_search(next_tag)
-                chapter_name = chapter_regex['name']
-                chapter_id = chapter_regex['id']
+            # if next_tag:
+            #     chapter_regex = chapter_num_search(next_tag)
+            #     chapter_name = chapter_regex['name']
+            #     chapter_id = chapter_regex['id']
+            #
+            #     next_tag = next_tag.find_next('h3',
+            #                                   class_='section-head',
+            #                                   text=lambda t: t and all([excl not in t.lower() for
+            #                                                             excl in headers_to_exclude])
+            #                                                     and _re.search('^\s*\xa7[^\xa7]', t))
+            #     if next_tag:
+            #         section_regex = section_num_search(next_tag)
+            #         section_id = section_regex['id']
+            #
+            #         next_tag = next_tag.find_next(['h3', 'p'])
+            #
+            #         out.append({'name': chapter_name,
+            #                     'id': chapter_id,
+            #                     'parsed': {section_id: []}})
 
-                next_tag = next_tag.find_next('h3',
-                                              class_='section-head',
-                                              text=lambda text: text and all([excl not in text.lower() for
-                                                                              excl in headers_to_exclude])
-                                                                and _re.search('^\s*\xa7[^\xa7]', text))
-                if next_tag:
-                    section_regex = section_num_search(next_tag)
-                    section_id = section_regex['id']
+            next_tag = soup.find('h3')
 
-                    next_tag = next_tag.find_next(['h3', 'p'])
+            while next_tag:
+                chapter_bool = next_tag.name == 'h3' and next_tag.find('strong') and not \
+                    next_tag.find('sup') and _re.search('^chapter[^s]', next_tag.text.lower())
+                section_bool = next_tag.name == 'h3' and \
+                               'class' in next_tag.attrs and next_tag['class'][0] == 'section-head'
+
+                valid_section_bool = all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) \
+                                     and _re.search('^\s*\xa7[^\xa7]', next_tag.text)
+                par_bool = next_tag.name == 'p' and 'class' in next_tag.attrs and \
+                           'statutory' in next_tag['class'][0]
+
+                if chapter_bool:
+                    if i is None:
+                        i = 0
+                    else:
+                        i += 1
+
+                    chapter_regex = chapter_num_search(next_tag)
+                    chapter_name = chapter_regex['name']
+                    chapter_id = chapter_regex['id']
 
                     out.append({'name': chapter_name,
                                 'id': chapter_id,
-                                'parsed': {section_id: []}})
+                                'parsed': {}})
 
-                    while next_tag:
-                        chapter_bool = 'class' in next_tag.attrs and next_tag['class'][0] == 'chapter-head' and \
-                                       next_tag.find('strong') and not next_tag.find(
-                            'sup') and 'CHAPTERS' not in next_tag.text
-                        section_bool = 'class' in next_tag.attrs and next_tag['class'][0] == 'section-head'
-                        valid_section_bool = all([excl not in next_tag.text.lower() for excl in headers_to_exclude]) \
-                                             and _re.search('^\s*\xa7[^\xa7]', next_tag.text)
-                        par_bool = 'class' in next_tag.attrs and 'statutory' in next_tag['class'][0]
+                    next_tag = next_tag.find_next(['h3', 'p'])
+                elif len(out) > 0:
+                    if section_bool:
+                        if valid_section_bool:
+                            section_regex = section_num_search(next_tag)
+                            section_id = section_regex['id']
 
-                        if chapter_bool:
-                            i += 1
+                            out[i]['parsed'][section_id] = []
 
-                            chapter_regex = chapter_num_search(next_tag)
-                            chapter_name = chapter_regex['name']
-                            chapter_id = chapter_regex['id']
-
-                            out.append({'name': chapter_name,
-                                        'id': chapter_id,
-                                        'parsed': {}})
-
-                            next_tag = next_tag.find_next(['h3', 'p'])
-
-                        elif section_bool:
-                            if valid_section_bool:
-                                section_regex = section_num_search(next_tag)
-                                section_id = section_regex['id']
-
-                                out[i]['parsed'][section_id] = []
-
-                                next_tag = next_tag.find_next(['h3', 'p'])
-
-                            else:
-                                next_tag = next_tag.find_next('h3')
-
-                        elif par_bool:
-                            out[i]['parsed'][section_id].append(next_tag.text)
                             next_tag = next_tag.find_next(['h3', 'p'])
 
                         else:
-                            next_tag = next_tag.find_next(['h3', 'p'])
+                            next_tag = next_tag.find_next('h3')
+
+                    elif par_bool:
+                        out[i]['parsed'][section_id].append(next_tag.text)
+                        next_tag = next_tag.find_next(['h3', 'p'])
+
+                    else:
+                        next_tag = next_tag.find_next(['h3', 'p'])
+                else:
+                    next_tag = next_tag.find_next('h3')
 
             return out
 
         temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
         titles = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
+
+        # filter out appendix titles
+        titles = [fname for fname in titles if not _re.search('[0-9]+a', fname)]
 
         for title in titles:
             with open(_os.path.join(temp_folder, title)) as f:
