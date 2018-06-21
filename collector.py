@@ -285,6 +285,16 @@ class DataManager:
                             else:
                                 f.write('')
 
+                        # writing as output is generated for safety
+                        if write:
+                            with open(out_path, 'a') as f:
+                                writer = DictUnicodeWriter(f, fieldnames=fieldnames)
+                                if len(out) == 1:
+                                    writer.writeheader()
+
+                                writer.writerow(out[-1])
+
+        # overwriting the whole thing at the end - probably not necessary
         if write:
             with open(out_path, 'wb') as f:
                 writer = DictUnicodeWriter(f, fieldnames=fieldnames)
