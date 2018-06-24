@@ -161,10 +161,11 @@ class UnitedStates(_CountryBase):
             return out
 
         temp_folder = _os.path.join(_tempfile.gettempdir(), publication_id)
-        titles = [fname for fname in _os.listdir(temp_folder) if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname)]
+        titles = [fname for fname in _os.listdir(temp_folder)
+                  if _re.search('[0-9]+usc[0-9]+[a-z]?\.htm', fname.lower())]
 
         # filter out appendix titles
-        titles = [fname for fname in titles if not _re.search('[0-9]+a', fname)]
+        titles = [fname for fname in titles if not _re.search('[0-9]+a', fname.lower())]
 
         for title in titles:
             with open(_os.path.join(temp_folder, title)) as f:
@@ -172,7 +173,7 @@ class UnitedStates(_CountryBase):
 
             title_parsed = parser(title_soup)
 
-            title_id = _re.sub('^[0-9]+usc|\.htm', '', title)
+            title_id = _re.sub('^[0-9]+usc|\.htm', '', title.lower())
             title_folder = _os.path.join(self.data_path, title_id)
             if not _os.path.isdir(title_folder):
                 _os.mkdir(title_folder)

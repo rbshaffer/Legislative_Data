@@ -291,7 +291,7 @@ class DataManager:
                         if write:
                             with open(out_path, 'a') as f:
                                 writer = DictUnicodeWriter(f, fieldnames=fieldnames)
-                                if len(out) == 1:
+                                if os.path.getsize(out_path) == 0:
                                     writer.writeheader()
 
                                 writer.writerow(out[-1])
